@@ -1,0 +1,384 @@
+package com.example.ui.screens
+
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import com.example.data.Language
+import com.example.ui.MarcoViewModel
+import com.example.ui.theme.MarcoCardSurface
+import com.example.ui.theme.MarcoCyanPrimary
+import com.example.ui.theme.MarcoDarkBackground
+import com.example.ui.theme.MarcoEmeraldSuccess
+import com.example.ui.theme.MarcoPinkAccent
+import com.example.ui.theme.MarcoTextSecondary
+
+@Composable
+fun SettingsScreen(
+    viewModel: MarcoViewModel,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val preferredLanguage by viewModel.preferredLanguage.collectAsState()
+    val isBackgroundActive by viewModel.isBackgroundActive.collectAsState()
+    val isWakeWordActive by viewModel.isContinuousWakeWordActive.collectAsState()
+
+    var speechRate by remember { mutableFloatStateOf(viewModel.textToSpeech.speechRate) }
+    var pitch by remember { mutableFloatStateOf(viewModel.textToSpeech.pitch) }
+
+    val permissionsToRequest = arrayOf(
+        Manifest.permission.RECORD_AUDIO,
+        Manifest.permission.CALL_PHONE,
+        Manifest.permission.READ_CONTACTS
+    )
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ -> }
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MarcoDarkBackground)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Text(
+                text = "MARCO Settings",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = "Voice, Language & Permissions",
+                style = MaterialTheme.typography.bodySmall,
+                color = MarcoTextSecondary
+            )
+        }
+
+        // Response Language Setting
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MarcoCardSurface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Preferred Response Language",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MarcoCyanPrimary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Language.entries.forEach { lang ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(lang.displayName, color = MaterialTheme.colorScheme.onSurface)
+                            if (preferredLanguage == lang) {
+                                Button(
+                                    onClick = {},
+                                    colors = ButtonDefaults.buttonColors(containerColor = MarcoCyanPrimary)
+                                ) {
+                                    Text("Active", color = androidx.compose.ui.graphics.Color.Black)
+                                }
+                            } else {
+                                OutlinedButton(
+                                    onClick = { viewModel.setPreferredLanguage(lang) },
+                                    modifier = Modifier.testTag("set_lang_${lang.code}")
+                                ) {
+                                    Text("Select")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Local Lightweight Wake Word Detection Settings Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MarcoCardSurface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Local Lightweight Wake-Word Engine",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MarcoCyanPrimary
+                            )
+                            Text(
+                                text = "Always listening locally for 'Hey MARCO', 'MARCO', or 'JARVIS'",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MarcoTextSecondary
+                            )
+                        }
+                        Switch(
+                            checked = isWakeWordActive,
+                            onCheckedChange = { viewModel.setContinuousWakeWord(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MarcoEmeraldSuccess,
+                                checkedTrackColor = MarcoEmeraldSuccess.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier.testTag("wakeword_switch")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Active Trigger Phrases:",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "• English: \"Hey MARCO\", \"MARCO\", \"JARVIS\", \"Hey JARVIS\"\n• Tamil: \"மார்கோ\", \"ஹே மார்கோ\"\n• Hindi: \"मार्को\", \"हे मार्को\", \"जार्विस\"",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MarcoTextSecondary
+                    )
+                }
+            }
+        }
+
+        // Background Service Toggle
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MarcoCardSurface)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Background Assistant Mode",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MarcoCyanPrimary
+                        )
+                        Text(
+                            text = "Listens for 'Hey MARCO' in foreground service",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MarcoTextSecondary
+                        )
+                    }
+                    Switch(
+                        checked = isBackgroundActive,
+                        onCheckedChange = { viewModel.toggleBackgroundService() },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MarcoEmeraldSuccess,
+                            checkedTrackColor = MarcoEmeraldSuccess.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.testTag("bg_service_switch")
+                    )
+                }
+            }
+        }
+
+        // Voice Model Selection (Male vs Female)
+        item {
+            val currentGender by viewModel.voiceGender.collectAsState()
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MarcoCardSurface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Voice Model Selection",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MarcoCyanPrimary
+                    )
+                    Text(
+                        text = "Select assistant voice persona model",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MarcoTextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    com.example.voice.VoiceGender.entries.forEach { gender ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(gender.displayName, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
+                            if (currentGender == gender) {
+                                Button(
+                                    onClick = {},
+                                    colors = ButtonDefaults.buttonColors(containerColor = MarcoCyanPrimary)
+                                ) {
+                                    Text("Active", color = androidx.compose.ui.graphics.Color.Black)
+                                }
+                            } else {
+                                OutlinedButton(
+                                    onClick = { viewModel.setVoiceGender(gender) },
+                                    modifier = Modifier.testTag("select_voice_${gender.name}")
+                                ) {
+                                    Text("Select")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // TTS Speech Rate & Pitch
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MarcoCardSurface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Voice Parameters",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MarcoCyanPrimary
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text("Speech Speed: ${String.format("%.1f", speechRate)}x", color = MaterialTheme.colorScheme.onSurface)
+                    Slider(
+                        value = speechRate,
+                        onValueChange = {
+                            speechRate = it
+                            viewModel.textToSpeech.speechRate = it
+                        },
+                        valueRange = 0.5f..2.0f,
+                        colors = SliderDefaults.colors(thumbColor = MarcoCyanPrimary, activeTrackColor = MarcoCyanPrimary)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text("Voice Pitch: ${String.format("%.1f", pitch)}x", color = MaterialTheme.colorScheme.onSurface)
+                    Slider(
+                        value = pitch,
+                        onValueChange = {
+                            pitch = it
+                            viewModel.textToSpeech.pitch = it
+                        },
+                        valueRange = 0.5f..1.8f,
+                        colors = SliderDefaults.colors(thumbColor = MarcoCyanPrimary, activeTrackColor = MarcoCyanPrimary)
+                    )
+                }
+            }
+        }
+
+        // Permission Management
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MarcoCardSurface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Android System Permissions",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MarcoCyanPrimary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val micGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                    val callGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED
+                    val contactsGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+
+                    PermissionStatusRow("Microphone (Voice)", micGranted)
+                    PermissionStatusRow("Phone Calls", callGranted)
+                    PermissionStatusRow("Contacts", contactsGranted)
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = { permissionLauncher.launch(permissionsToRequest) },
+                        colors = ButtonDefaults.buttonColors(containerColor = MarcoCyanPrimary),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("request_permissions_button")
+                    ) {
+                        Text("Grant Required Permissions", color = androidx.compose.ui.graphics.Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PermissionStatusRow(label: String, isGranted: Boolean) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            text = if (isGranted) "Granted ✓" else "Not Granted ✗",
+            color = if (isGranted) MarcoEmeraldSuccess else MarcoPinkAccent,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}

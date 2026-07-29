@@ -1,0 +1,6 @@
+{
+  "name": "MARCO Voice Assistant",
+  "description": "Multilingual Android AI Voice Assistant supporting Tamil, English, and Hindi with natural voice control and device app integrations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
