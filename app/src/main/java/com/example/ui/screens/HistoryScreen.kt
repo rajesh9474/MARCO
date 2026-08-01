@@ -58,7 +58,7 @@ fun HistoryScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MarcoDarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
         Row(

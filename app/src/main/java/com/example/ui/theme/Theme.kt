@@ -21,20 +21,24 @@ private val DarkColorScheme = darkColorScheme(
     onPrimary = Color.Black,
     onSecondary = Color.White,
     onBackground = MarcoTextPrimary,
-    onSurface = MarcoTextPrimary
+    onSurface = MarcoTextPrimary,
+    onSurfaceVariant = MarcoTextSecondary,
+    outline = Color(0xFF334155)
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF006875),
-    secondary = Color(0xFF6B4EA2),
-    tertiary = Color(0xFFB8005A),
+    primary = Color(0xFF0284C7),
+    secondary = Color(0xFF4F46E5),
+    tertiary = Color(0xFFE11D48),
     background = Color(0xFFF8FAFC),
     surface = Color(0xFFFFFFFF),
     surfaceVariant = Color(0xFFF1F5F9),
     onPrimary = Color.White,
     onSecondary = Color.White,
     onBackground = Color(0xFF0F172A),
-    onSurface = Color(0xFF0F172A)
+    onSurface = Color(0xFF0F172A),
+    onSurfaceVariant = Color(0xFF475569),
+    outline = Color(0xFFCBD5E1)
 )
 
 @Composable

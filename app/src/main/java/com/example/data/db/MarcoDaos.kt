@@ -8,11 +8,14 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ConversationDao {
-    @Query("SELECT * FROM conversations ORDER BY timestamp DESC")
+    @Query("SELECT * FROM conversations ORDER BY timestamp DESC LIMIT 50")
     fun getAllConversations(): Flow<List<ConversationEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertConversation(conversation: ConversationEntity): Long
+
+    @Query("DELETE FROM conversations WHERE id NOT IN (SELECT id FROM conversations ORDER BY timestamp DESC LIMIT 50)")
+    suspend fun pruneOldConversations()
 
     @Query("DELETE FROM conversations")
     suspend fun clearAll()

@@ -9,6 +9,13 @@ object WakeWordDetector {
     private val _isWakeWordListening = MutableStateFlow(true)
     val isWakeWordListening: StateFlow<Boolean> = _isWakeWordListening.asStateFlow()
 
+    private val _kwsSensitivity = MutableStateFlow(0.80f)
+    val kwsSensitivity: StateFlow<Float> = _kwsSensitivity.asStateFlow()
+
+    fun setSensitivity(value: Float) {
+        _kwsSensitivity.value = value.coerceIn(0.1f, 1.0f)
+    }
+
     private val wakeWords = listOf(
         "hey marco", "marco", "hello marco", "hi marco", "ok marco",
         "jarvis", "hey jarvis", "hello jarvis", "ok jarvis",

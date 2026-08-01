@@ -14,6 +14,8 @@ import com.example.data.ToolResult
 
 class MarcoToolRegistry(private val context: Context) {
 
+    private val commandHandler = MarcoCommandHandler(context)
+
     fun getAllTools(): List<ToolInfo> = listOf(
         ToolInfo(
             id = "search_youtube",
@@ -198,75 +200,7 @@ class MarcoToolRegistry(private val context: Context) {
     }
 
     private fun openApplication(appName: String): ToolResult {
-        val lower = appName.lowercase()
-        val packageName = when {
-            lower.contains("youtube") -> "com.google.android.youtube"
-            lower.contains("whatsapp") -> "com.whatsapp"
-            lower.contains("chrome") || lower.contains("browser") -> "com.android.chrome"
-            lower.contains("map") -> "com.google.android.apps.maps"
-            lower.contains("calculator") || lower.contains("calc") -> null
-            lower.contains("camera") -> null
-            else -> null
-        }
-
-        if (lower.contains("calculator")) {
-            val calcIntent = Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_APP_CALCULATOR)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            return launchIntentOrError(calcIntent, "Calculator")
-        }
-
-        if (lower.contains("camera")) {
-            return openCamera()
-        }
-
-        if (lower.contains("setting")) {
-            val settingsIntent = Intent(Settings.ACTION_SETTINGS).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            return launchIntentOrError(settingsIntent, "Settings")
-        }
-
-        if (packageName != null) {
-            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
-            if (launchIntent != null) {
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(launchIntent)
-                return ToolResult(
-                    success = true,
-                    message = "Opened $appName.",
-                    actionExecuted = "Launch App",
-                    details = mapOf("package" to packageName)
-                )
-            }
-        }
-
-        // Search installed packages
-        val pm = context.packageManager
-        val packages = pm.getInstalledApplications(0)
-        for (app in packages) {
-            val label = pm.getApplicationLabel(app).toString().lowercase()
-            if (label.contains(lower)) {
-                val launchIntent = pm.getLaunchIntentForPackage(app.packageName)
-                if (launchIntent != null) {
-                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(launchIntent)
-                    return ToolResult(
-                        success = true,
-                        message = "Opened ${pm.getApplicationLabel(app)}.",
-                        actionExecuted = "Launch App",
-                        details = mapOf("package" to app.packageName)
-                    )
-                }
-            }
-        }
-
-        return ToolResult(
-            success = false,
-            message = "$appName was not found on this device.",
-            actionExecuted = "App Not Found"
-        )
+        return commandHandler.launchInstalledAppByVoiceCommand(appName)
     }
 
     private fun prepareSendMessage(contact: String, text: String): ToolResult {

@@ -58,6 +58,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -117,6 +118,7 @@ fun MarcoHomeScreen(
     val partialText by viewModel.speechToText.partialText.collectAsState()
     val isSpeaking by viewModel.textToSpeech.isSpeaking.collectAsState()
     val rmsDb by viewModel.speechToText.rmsDb.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
 
     var typedInput by remember { mutableStateOf("") }
 
@@ -136,26 +138,28 @@ fun MarcoHomeScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MarcoDarkBackground)
+            .background(MaterialTheme.colorScheme.background)
     ) {
+        val ambientPrimary = MaterialTheme.colorScheme.primary
+        val ambientSecondary = MaterialTheme.colorScheme.secondary
         // Atmospheric Radial Glow Canvas Background
         Canvas(modifier = Modifier.fillMaxSize()) {
             val canvasWidth = size.width
             val canvasHeight = size.height
 
-            // Cyan ambient top glow
+            // Cyan/Primary ambient top glow
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(MarcoCyanPrimary.copy(alpha = 0.18f), Color.Transparent),
+                    colors = listOf(ambientPrimary.copy(alpha = 0.15f), Color.Transparent),
                     center = Offset(canvasWidth * 0.5f, canvasHeight * 0.25f),
                     radius = canvasWidth * 0.7f
                 )
             )
 
-            // Indigo bottom glow
+            // Indigo/Secondary bottom glow
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(MarcoPurpleSecondary.copy(alpha = 0.15f), Color.Transparent),
+                    colors = listOf(ambientSecondary.copy(alpha = 0.12f), Color.Transparent),
                     center = Offset(canvasWidth * 0.5f, canvasHeight * 0.8f),
                     radius = canvasWidth * 0.8f
                 )
@@ -201,11 +205,14 @@ fun MarcoHomeScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // JARVIS CORE ONLINE Badge
+                        // JARVIS CORE ONLINE / OFFLINE Badge
                         Surface(
                             shape = RoundedCornerShape(20.dp),
                             color = MarcoSurfaceDark,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MarcoCyanPrimary.copy(alpha = 0.4f))
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isOnline) MarcoCyanPrimary.copy(alpha = 0.4f) else Color(0xFFF59E0B)
+                            )
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
@@ -215,14 +222,53 @@ fun MarcoHomeScreen(
                                     modifier = Modifier
                                         .size(8.dp)
                                         .clip(CircleShape)
-                                        .background(MarcoEmeraldSuccess)
+                                        .background(if (isOnline) MarcoEmeraldSuccess else Color(0xFFF59E0B))
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "JARVIS CORE ONLINE • தமிழ் | EN | हिन्दी",
+                                    text = if (isOnline) "JARVIS CORE ONLINE • தமிழ் | EN | हिन्दी" else "OFFLINE MODE ACTIVE • Local Rule Engine",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = MarcoTextPrimary
+                                    color = if (isOnline) MarcoTextPrimary else Color(0xFFFDE68A)
                                 )
+                            }
+                        }
+                    }
+                }
+
+                // Offline Network Alert Banner
+                if (!isOnline) {
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("offline_network_banner"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B4B)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF59E0B))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = "Offline Mode Alert",
+                                    tint = Color(0xFFF59E0B),
+                                    modifier = Modifier.size(26.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "Offline Mode Active",
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = Color(0xFFFDE68A)
+                                    )
+                                    Text(
+                                        text = "Device is disconnected from the internet. MARCO has automatically fallback-switched to the zero-latency local rule engine for offline voice commands (WhatsApp, Calls, Camera, Flashlight, Alarms).",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFE2E8F0)
+                                    )
+                                }
                             }
                         }
                     }
@@ -267,6 +313,14 @@ fun MarcoHomeScreen(
                     )
                 }
 
+                // Real-time Animated Waveform Component when listening
+                item {
+                    RealtimeListeningWaveform(
+                        isListening = isListening,
+                        rmsDb = rmsDb
+                    )
+                }
+
                 // Real-time Speech Transcription & Status Output
                 item {
                     Column(
@@ -282,19 +336,33 @@ fun MarcoHomeScreen(
                             AssistantState.IDLE -> "Tap orb or speak command"
                         }
 
-                        Text(
-                            text = statusText.uppercase(),
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            ),
-                            color = when (assistantState) {
-                                AssistantState.LISTENING -> MarcoPinkAccent
-                                AssistantState.EXECUTING -> MarcoEmeraldSuccess
-                                AssistantState.PROCESSING -> MarcoCyanPrimary
-                                else -> MarcoTextSecondary
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            if (assistantState == AssistantState.LISTENING) {
+                                PulsingMicIcon(
+                                    isListening = true,
+                                    iconSize = 18.dp,
+                                    tint = MarcoPinkAccent
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
                             }
-                        )
+
+                            Text(
+                                text = statusText.uppercase(),
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                ),
+                                color = when (assistantState) {
+                                    AssistantState.LISTENING -> MarcoPinkAccent
+                                    AssistantState.EXECUTING -> MarcoEmeraldSuccess
+                                    AssistantState.PROCESSING -> MarcoCyanPrimary
+                                    else -> MarcoTextSecondary
+                                }
+                            )
+                        }
 
                         val activeSpeechText = if (isListening && partialText.isNotBlank()) {
                             "\"$partialText\""
@@ -415,6 +483,148 @@ fun MarcoHomeScreen(
                     }
                 }
 
+                // AI Creation & Intelligence Studio Card
+                item {
+                    val isHighThinking by viewModel.isHighThinkingEnabled.collectAsState()
+                    val aiContent by viewModel.aiGeneratedContent.collectAsState()
+                    var studioPrompt by remember { mutableStateOf("") }
+                    var studioMode by remember { mutableStateOf("IMAGE") } // IMAGE, MUSIC, VISION
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("ai_studio_card"),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = MarcoCardSurface),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MarcoCyanPrimary.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "AI CREATIVE STUDIO",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black, letterSpacing = 1.sp),
+                                        color = MarcoCyanPrimary
+                                    )
+                                    Text(
+                                        text = "Powered by Gemini 3.1 Pro, Flash & Lyria 3",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MarcoTextSecondary
+                                    )
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("High Thinking", style = MaterialTheme.typography.labelSmall, color = MarcoTextMuted)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Switch(
+                                        checked = isHighThinking,
+                                        onCheckedChange = { viewModel.setHighThinking(it) },
+                                        modifier = Modifier.testTag("high_thinking_switch")
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Mode Selector
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf("IMAGE" to "🎨 Image", "MUSIC" to "🎵 Lyria", "VISION" to "👁️ Vision").forEach { (mode, label) ->
+                                    FilterChip(
+                                        selected = studioMode == mode,
+                                        onClick = { studioMode = mode },
+                                        label = { Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MarcoCyanPrimary,
+                                            selectedLabelColor = Color.Black,
+                                            containerColor = Color(0xFF0F172A),
+                                            labelColor = MarcoTextSecondary
+                                        )
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedTextField(
+                                value = studioPrompt,
+                                onValueChange = { studioPrompt = it },
+                                placeholder = {
+                                    Text(
+                                        when (studioMode) {
+                                            "IMAGE" -> "Prompt: 'A glowing futuristic JARVIS AI arc core...'"
+                                            "MUSIC" -> "Prompt: 'A 30-second orchestral cyberpunk beat...'"
+                                            else -> "Describe screenshot or image to analyze..."
+                                        },
+                                        color = MarcoTextMuted,
+                                        fontSize = 12.sp
+                                    )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("studio_prompt_input"),
+                                shape = RoundedCornerShape(12.dp),
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MarcoCyanPrimary,
+                                    unfocusedBorderColor = Color(0xFF334155),
+                                    focusedContainerColor = Color(0xFF090D16),
+                                    unfocusedContainerColor = Color(0xFF090D16)
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Button(
+                                onClick = {
+                                    when (studioMode) {
+                                        "IMAGE" -> viewModel.generateImagePrompt(studioPrompt)
+                                        "MUSIC" -> viewModel.generateMusicTrack(studioPrompt)
+                                        "VISION" -> viewModel.analyzeImagePhoto(studioPrompt, "")
+                                    }
+                                    studioPrompt = ""
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MarcoCyanPrimary),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("studio_generate_button")
+                            ) {
+                                Text(
+                                    when (studioMode) {
+                                        "IMAGE" -> "Generate AI Image Artwork"
+                                        "MUSIC" -> "Compose Lyria Audio Track"
+                                        else -> "Run Gemini Vision Analysis"
+                                    },
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            if (!aiContent.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Color(0xFF090D16),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, MarcoPurpleSecondary)
+                                ) {
+                                    Text(
+                                        text = aiContent!!,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MarcoTextPrimary,
+                                        modifier = Modifier.padding(10.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Quick Action Chip Carousel
                 item {
                     Column(modifier = Modifier.fillMaxWidth()) {
@@ -457,38 +667,185 @@ fun MarcoHomeScreen(
                     }
                 }
 
-                // Recent Conversations Logs
+                // Recent Conversations Logs (Up to 50 stored in local Room DB formatted as chat bubbles)
                 if (conversations.isNotEmpty()) {
                     item {
-                        Text(
-                            text = "Interaction History",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                            color = MarcoTextSecondary,
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 8.dp)
-                        )
+                                .padding(top = 16.dp, bottom = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Keyboard,
+                                    contentDescription = null,
+                                    tint = MarcoCyanPrimary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "CONVERSATION HISTORY (${conversations.size}/50)",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp
+                                    ),
+                                    color = MarcoTextSecondary
+                                )
+                            }
+                            Text(
+                                text = "Clear All",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MarcoPinkAccent,
+                                modifier = Modifier
+                                    .clickable { viewModel.clearConversationHistory() }
+                                    .testTag("clear_history_button")
+                            )
+                        }
                     }
 
-                    items(conversations.take(4)) { item ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = MarcoSurfaceDark.copy(alpha = 0.7f)),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B))
+                    items(
+                        items = conversations,
+                        key = { it.id }
+                    ) { item ->
+                        val timeStr = remember(item.timestamp) {
+                            try {
+                                val sdf = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
+                                sdf.format(java.util.Date(item.timestamp))
+                            } catch (e: Exception) {
+                                ""
+                            }
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .testTag("conversation_card_${item.id}"),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = "You: ${item.userPrompt}",
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    color = MarcoCyanPrimary
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "MARCO: ${item.marcoResponse}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MarcoTextPrimary
-                                )
+                            // 1. User Chat Bubble (Aligned Right)
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 4.dp),
+                                    color = MarcoCyanPrimary.copy(alpha = 0.15f),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, MarcoCyanPrimary.copy(alpha = 0.35f)),
+                                    modifier = Modifier.widthIn(max = 300.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = "You",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = MarcoCyanPrimary
+                                            )
+                                            if (timeStr.isNotBlank()) {
+                                                Text(
+                                                    text = timeStr,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MarcoTextMuted,
+                                                    fontSize = 10.sp
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = item.userPrompt,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MarcoTextPrimary
+                                        )
+                                    }
+                                }
+                            }
+
+                            // 2. MARCO Response Chat Bubble (Aligned Left)
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 16.dp),
+                                    color = MarcoCardSurface,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1E293B)),
+                                    modifier = Modifier.widthIn(max = 320.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(16.dp)
+                                                        .clip(CircleShape)
+                                                        .background(MarcoPurpleSecondary),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(text = "M", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                }
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "MARCO",
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = MarcoPurpleSecondary
+                                                )
+                                            }
+                                            if (item.language.isNotBlank()) {
+                                                Surface(
+                                                    color = MarcoSurfaceDark,
+                                                    shape = RoundedCornerShape(4.dp)
+                                                ) {
+                                                    Text(
+                                                        text = item.language.uppercase(),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MarcoTextMuted,
+                                                        fontSize = 9.sp,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = item.marcoResponse,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MarcoTextPrimary
+                                        )
+                                        if (item.executedTool.isNotBlank() && item.executedTool != "none") {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier
+                                                    .background(MarcoSurfaceDark, RoundedCornerShape(6.dp))
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = MarcoPurpleSecondary,
+                                                    modifier = Modifier.size(11.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = "Tool: ${item.executedTool}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MarcoPurpleSecondary,
+                                                    fontSize = 10.sp
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -560,9 +917,9 @@ fun MarcoHomeScreen(
                                 .background(if (isListening) MarcoPinkAccent else MarcoCyanPrimary)
                                 .testTag("mic_fab")
                         ) {
-                            Icon(
-                                imageVector = if (isListening) Icons.Default.Mic else Icons.Default.MicOff,
-                                contentDescription = "Mic FAB",
+                            PulsingMicIcon(
+                                isListening = isListening,
+                                iconSize = 24.dp,
                                 tint = Color.Black
                             )
                         }
@@ -743,33 +1100,224 @@ fun TheVoiceOrb(
                 .clickable { onOrbClick() }
                 .testTag("mic_button")
         ) {
-            // Inner Audio Visualizer Wave Bars
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                val activeWave = isListening || isSpeaking || state == AssistantState.PROCESSING
-                for (i in 0..5) {
-                    val barHeightAnim by infiniteTransition.animateFloat(
-                        initialValue = 12f,
-                        targetValue = if (activeWave) (28f + (i * 7f) % 28f + (rmsDb * 1.8f)) else 10f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(
-                                durationMillis = 220 + (i * 65),
-                                easing = FastOutSlowInEasing
+                PulsingMicIcon(
+                    isListening = isListening,
+                    iconSize = 28.dp,
+                    tint = Color.White
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Inner Audio Visualizer Wave Bars
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val activeWave = isListening || isSpeaking || state == AssistantState.PROCESSING
+                    for (i in 0..5) {
+                        val barHeightAnim by infiniteTransition.animateFloat(
+                            initialValue = 8f,
+                            targetValue = if (activeWave) (20f + (i * 5f) % 20f + (rmsDb * 1.5f)) else 6f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(
+                                    durationMillis = 220 + (i * 65),
+                                    easing = FastOutSlowInEasing
+                                ),
+                                repeatMode = RepeatMode.Reverse
                             ),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "wave_bar_$i"
+                            label = "wave_bar_$i"
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .width(4.dp)
+                                .height(barHeightAnim.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(Color.White)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PulsingMicIcon(
+    isListening: Boolean,
+    modifier: Modifier = Modifier,
+    iconSize: androidx.compose.ui.unit.Dp = 26.dp,
+    tint: Color = Color.White
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "mic_pulse_transition")
+
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = if (isListening) 1.35f else 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "mic_pulse_scale"
+    )
+
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = if (isListening) 0.15f else 0.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "mic_pulse_alpha"
+    )
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+    ) {
+        if (isListening) {
+            // Concentric animated pulsing aura 1
+            Box(
+                modifier = Modifier
+                    .size(iconSize * 2.2f)
+                    .scale(pulseScale)
+                    .clip(CircleShape)
+                    .background(MarcoPinkAccent.copy(alpha = pulseAlpha))
+            )
+            // Concentric animated pulsing aura 2
+            Box(
+                modifier = Modifier
+                    .size(iconSize * 1.6f)
+                    .scale(pulseScale * 0.85f)
+                    .clip(CircleShape)
+                    .background(MarcoCyanPrimary.copy(alpha = pulseAlpha * 1.5f))
+            )
+        }
+
+        Icon(
+            imageVector = if (isListening) Icons.Default.Mic else Icons.Default.MicOff,
+            contentDescription = "Active Microphone",
+            tint = if (isListening) tint else MarcoTextMuted,
+            modifier = Modifier
+                .size(iconSize)
+                .testTag("pulsing_mic_icon")
+        )
+    }
+}
+
+@Composable
+fun RealtimeListeningWaveform(
+    isListening: Boolean,
+    rmsDb: Float,
+    modifier: Modifier = Modifier
+) {
+    androidx.compose.animation.AnimatedVisibility(
+        visible = isListening,
+        enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+        exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
+    ) {
+        val infiniteTransition = rememberInfiniteTransition(label = "waveform_animation")
+
+        val phaseShift by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = (2 * Math.PI).toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(1200, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "phase_shift"
+        )
+
+        val secondaryPhase by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = -(2 * Math.PI).toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(850, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "secondary_phase"
+        )
+
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(84.dp)
+                .padding(vertical = 4.dp)
+                .testTag("realtime_waveform_visualizer"),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MarcoSurfaceDark.copy(alpha = 0.9f)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MarcoPinkAccent.copy(alpha = 0.5f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val width = size.width
+                    val height = size.height
+                    val centerY = height / 2f
+
+                    // Calculate amplitude driven by audio input volume (rmsDb)
+                    val baseAmp = 12f + (rmsDb.coerceIn(0f, 15f) * 3.5f)
+
+                    // 1. Primary smooth cyan sine wave path
+                    val cyanPath = androidx.compose.ui.graphics.Path()
+                    val frequency1 = 0.025f
+                    cyanPath.moveTo(0f, centerY)
+                    for (x in 0..width.toInt() step 4) {
+                        val envelope = kotlin.math.sin(x * Math.PI / width)
+                        val y = centerY + kotlin.math.sin(x * frequency1 + phaseShift) * baseAmp * envelope
+                        cyanPath.lineTo(x.toFloat(), y.toFloat())
+                    }
+
+                    drawPath(
+                        path = cyanPath,
+                        color = MarcoCyanPrimary,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = 3.dp.toPx(),
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round
+                        )
                     )
 
-                    Box(
-                        modifier = Modifier
-                            .width(5.dp)
-                            .height(barHeightAnim.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Color.White)
+                    // 2. Secondary magenta sine wave path
+                    val pinkPath = androidx.compose.ui.graphics.Path()
+                    val frequency2 = 0.035f
+                    pinkPath.moveTo(0f, centerY)
+                    for (x in 0..width.toInt() step 4) {
+                        val envelope = kotlin.math.sin(x * Math.PI / width)
+                        val y = centerY + kotlin.math.cos(x * frequency2 + secondaryPhase) * (baseAmp * 0.75f) * envelope
+                        pinkPath.lineTo(x.toFloat(), y.toFloat())
+                    }
+
+                    drawPath(
+                        path = pinkPath,
+                        color = MarcoPinkAccent,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = 2.dp.toPx(),
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round
+                        )
                     )
+
+                    // 3. Central vertical spectrum frequency bars
+                    val barCount = 22
+                    val barSpacing = width / (barCount + 1)
+                    for (i in 1..barCount) {
+                        val barX = i * barSpacing
+                        val barHeight = (baseAmp * kotlin.math.abs(kotlin.math.sin(i * 0.6f + phaseShift))).coerceAtLeast(6f)
+                        drawLine(
+                            color = MarcoPurpleSecondary.copy(alpha = 0.65f),
+                            start = androidx.compose.ui.geometry.Offset(barX, centerY - barHeight / 2f),
+                            end = androidx.compose.ui.geometry.Offset(barX, centerY + barHeight / 2f),
+                            strokeWidth = 3.dp.toPx(),
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round
+                        )
+                    }
                 }
             }
         }

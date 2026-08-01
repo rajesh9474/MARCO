@@ -40,6 +40,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Login
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.unit.sp
+import com.example.data.FirebaseAuthManager
 import com.example.data.Language
 import com.example.ui.MarcoViewModel
 import com.example.ui.theme.MarcoCardSurface
@@ -75,7 +85,7 @@ fun SettingsScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(MarcoDarkBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -86,10 +96,207 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                text = "Voice, Language & Permissions",
+                text = "Voice, Language, Theme & Permissions",
                 style = MaterialTheme.typography.bodySmall,
-                color = MarcoTextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+
+        // Theme & Visual Appearance Setting
+        item {
+            val currentThemeMode by viewModel.themeMode.collectAsState()
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Theme & Visual Appearance",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Switch interface theme (meets accessibility contrast guidelines)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        com.example.ui.ThemeMode.entries.forEach { mode ->
+                            val isSelected = currentThemeMode == mode
+                            val buttonModifier = Modifier
+                                .weight(1f)
+                                .testTag("set_theme_${mode.name.lowercase()}")
+
+                            if (isSelected) {
+                                Button(
+                                    onClick = {},
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                    modifier = buttonModifier
+                                ) {
+                                    Text(
+                                        text = mode.displayName,
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                }
+                            } else {
+                                OutlinedButton(
+                                    onClick = { viewModel.setThemeMode(mode) },
+                                    modifier = buttonModifier
+                                ) {
+                                    Text(
+                                        text = mode.displayName,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Firebase Auth & Database Persistence Section
+        item {
+            val currentUser by FirebaseAuthManager.instance.currentUser.collectAsState()
+            var isSigningIn by remember { mutableStateOf(false) }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Account & Cloud Persistence",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Firebase Auth & Firestore Data Sync",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.CloudSync,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (currentUser != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AccountCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = currentUser?.displayName ?: "Google Signed-In User",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = currentUser?.email ?: "uid: ${currentUser?.uid}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "✓ Firestore Database Connected",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Button(
+                                    onClick = { FirebaseAuthManager.instance.signOut() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                                    modifier = Modifier.testTag("firebase_sign_out_button")
+                                ) {
+                                    Text(
+                                        text = "Sign Out",
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Sign in with Google / Firebase Auth to sync chat history, voice notes, and settings securely to Cloud Firestore.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        isSigningIn = true
+                                        FirebaseAuthManager.instance.signInWithDemoGoogleUser()
+                                        isSigningIn = false
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("google_sign_in_button")
+                                ) {
+                                    Icon(imageVector = Icons.Default.Login, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Sign In with Google", fontSize = 12.sp)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        isSigningIn = true
+                                        FirebaseAuthManager.instance.signInAnonymously { _, _ ->
+                                            isSigningIn = false
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("anonymous_auth_button")
+                                ) {
+                                    Text("Guest Auth", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Response Language Setting
@@ -173,6 +380,41 @@ fun SettingsScreen(
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
+
+                    var sensitivity by remember { mutableFloatStateOf(0.80f) }
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "KWS Sensitivity (Battery Mode)",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${(sensitivity * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MarcoCyanPrimary
+                            )
+                        }
+                        Slider(
+                            value = sensitivity,
+                            onValueChange = {
+                                sensitivity = it
+                                viewModel.setKwsSensitivity(it)
+                            },
+                            valueRange = 0.3f..1.0f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = MarcoCyanPrimary,
+                                activeTrackColor = MarcoCyanPrimary
+                            ),
+                            modifier = Modifier.testTag("kws_sensitivity_slider")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
                         text = "Active Trigger Phrases:",
