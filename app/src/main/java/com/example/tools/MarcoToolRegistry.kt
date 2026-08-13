@@ -210,29 +210,42 @@ class MarcoToolRegistry(private val context: Context) {
 
     private fun prepareSendMessage(contact: String, text: String): ToolResult {
         return try {
-            val encodedMessage = Uri.encode(if (text.isNotBlank()) text else "Hello from MARCO Voice Assistant")
-            val whatsappUri = Uri.parse("https://api.whatsapp.com/send?text=$encodedMessage")
+            val resolvedPhone = if (contact.isNotBlank()) appIntentHandler.resolvePhoneNumber(contact) else ""
+            val cleanDigits = resolvedPhone.replace(Regex("[^0-9]"), "")
+            val messageBody = if (text.isNotBlank()) text else "Hello from MARCO Voice Assistant"
+            val encodedMessage = Uri.encode(messageBody)
+
+            val whatsappUri = if (cleanDigits.length >= 7) {
+                Uri.parse("https://api.whatsapp.com/send?phone=$cleanDigits&text=$encodedMessage")
+            } else {
+                Uri.parse("https://api.whatsapp.com/send?text=$encodedMessage")
+            }
+
             val intent = Intent(Intent.ACTION_VIEW, whatsappUri).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
+
+            val recipient = if (contact.isNotBlank()) contact else "contact"
+            val detailsMsg = if (cleanDigits.length >= 7) "Opened WhatsApp chat directly for $recipient ($cleanDigits) with message." else "Opened WhatsApp with message for $recipient."
+
             ToolResult(
                 success = true,
-                message = "Prepared WhatsApp message for ${if (contact.isNotBlank()) contact else "contact"}.",
-                actionExecuted = "WhatsApp Draft Prepared",
-                details = mapOf("contact" to contact, "message" to text)
+                message = detailsMsg,
+                actionExecuted = "WhatsApp Direct Action",
+                details = mapOf("contact" to contact, "phone" to cleanDigits, "message" to text)
             )
         } catch (e: Exception) {
             ToolResult(
                 success = false,
-                message = "WhatsApp is not installed or available.",
+                message = "WhatsApp is not installed or available on this device.",
                 actionExecuted = "Send Message Failed"
             )
         }
     }
 
     private fun makePhoneCall(contact: String): ToolResult {
-        return appIntentHandler.openDialerWithContactOrNumber(contact)
+        return appIntentHandler.makeDirectPhoneCall(contact)
     }
 
     private fun playOrControlMedia(command: String): ToolResult {

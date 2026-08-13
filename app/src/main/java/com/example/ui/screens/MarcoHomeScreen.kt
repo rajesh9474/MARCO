@@ -89,6 +89,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.shouldShowRationale
 import com.example.data.AssistantState
@@ -111,8 +112,12 @@ fun MarcoHomeScreen(
     viewModel: MarcoViewModel,
     modifier: Modifier = Modifier
 ) {
-    val micPermissionState = rememberPermissionState(
-        permission = android.Manifest.permission.RECORD_AUDIO
+    val permissionsState = rememberMultiplePermissionsState(
+        permissions = listOf(
+            android.Manifest.permission.RECORD_AUDIO,
+            android.Manifest.permission.CALL_PHONE,
+            android.Manifest.permission.READ_CONTACTS
+        )
     )
 
     val assistantState by viewModel.assistantState.collectAsState()
@@ -131,10 +136,11 @@ fun MarcoHomeScreen(
     var typedInput by remember { mutableStateOf("") }
 
     val handleMicToggle = {
-        if (micPermissionState.status.isGranted) {
+        val audioGranted = permissionsState.permissions.firstOrNull { it.permission == android.Manifest.permission.RECORD_AUDIO }?.status?.isGranted == true
+        if (audioGranted) {
             if (isListening) viewModel.stopListening() else viewModel.startListening()
         } else {
-            micPermissionState.launchPermissionRequest()
+            permissionsState.launchMultiplePermissionRequest()
         }
     }
 
@@ -251,9 +257,9 @@ fun MarcoHomeScreen(
                     }
                 }
 
-                // Microphone Permission Banner (Accompanist Permissions)
+                // Assistant Runtime Permissions Banner (Accompanist Permissions)
                 item {
-                    MicPermissionBanner(permissionState = micPermissionState)
+                    AssistantPermissionsBanner(permissionsState = permissionsState)
                 }
 
                 // Offline Network Alert Banner
@@ -1342,18 +1348,18 @@ fun RealtimeListeningWaveform(
 }
 
 /**
- * Accompanist Permissions Banner for requesting and managing RECORD_AUDIO permission at runtime.
+ * Accompanist Permissions Banner for requesting and managing RECORD_AUDIO, CALL_PHONE, and READ_CONTACTS permissions.
  */
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-fun MicPermissionBanner(
-    permissionState: com.google.accompanist.permissions.PermissionState
+fun AssistantPermissionsBanner(
+    permissionsState: com.google.accompanist.permissions.MultiplePermissionsState
 ) {
-    if (!permissionState.status.isGranted) {
+    if (!permissionsState.allPermissionsGranted) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag("mic_permission_card"),
+                .testTag("assistant_permissions_card"),
             shape = RoundedCornerShape(14.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF31101E)),
             border = androidx.compose.foundation.BorderStroke(1.dp, MarcoPinkAccent)
@@ -1362,24 +1368,20 @@ fun MicPermissionBanner(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.MicOff,
-                        contentDescription = "Microphone Access Required",
+                        contentDescription = "Assistant Permissions Required",
                         tint = MarcoPinkAccent,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Microphone Access Required",
+                            text = "Assistant Permissions Required",
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                             color = Color.White
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = if (permissionState.status.shouldShowRationale) {
-                                "Microphone permission is required for MARCO to detect the 'Hey MARCO' wake-word and convert your voice into commands."
-                            } else {
-                                "Grant RECORD_AUDIO permission to enable voice recognition and assistant capabilities."
-                            },
+                            text = "Grant Microphone, Phone Call, and Contacts permissions for MARCO to directly make calls, send WhatsApp messages, and recognize voice commands.",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFFFCA5A5)
                         )
@@ -1387,16 +1389,16 @@ fun MicPermissionBanner(
                 }
                 Spacer(modifier = Modifier.height(10.dp))
                 Button(
-                    onClick = { permissionState.launchPermissionRequest() },
+                    onClick = { permissionsState.launchMultiplePermissionRequest() },
                     colors = ButtonDefaults.buttonColors(containerColor = MarcoPinkAccent),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("grant_mic_permission_button")
+                        .testTag("grant_assistant_permissions_button")
                 ) {
-                    Icon(Icons.Default.Mic, contentDescription = null, tint = Color.Black)
+                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Grant Microphone Permission",
+                        text = "Grant All Permissions",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                         color = Color.Black
                     )

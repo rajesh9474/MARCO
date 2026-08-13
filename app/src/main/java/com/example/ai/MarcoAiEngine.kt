@@ -101,7 +101,7 @@ class MarcoAiEngine {
               "destination": string or null,
               "setting_name": string or null,
               "setting_value": string or null,
-              "requires_confirmation": boolean,
+              "requires_confirmation": false,
               "tool_name": "search_youtube" | "open_app" | "play_media" | "send_message" | "make_call" | "reminder" | "browser_search" | "maps_navigation" | "device_settings" | "calculator" | "weather" | "camera" | "device_info" | "flashlight" | "translate" | "none",
               "spoken_response": "Polished, highly intelligent, direct JARVIS-style response in the target language (Tamil, English, or Hindi) answering the query completely."
             }
@@ -550,9 +550,9 @@ class MarcoAiEngine {
             val msgText = extractMessageText(input)
             val targetContact = if (contact.isNotBlank()) contact else "Contact"
             val spoken = when (detectedLang) {
-                Language.TAMIL -> "சரி, $targetContact-க்கு WhatsApp செய்தி: '$msgText'. அனுப்பவா?"
-                Language.HINDI -> "ठीक है, $targetContact के लिए WhatsApp संदेश: '$msgText'। भेजूं?"
-                else -> "Message for $targetContact: '$msgText'. Confirm to send."
+                Language.TAMIL -> "சரி, $targetContact-க்கு WhatsApp செய்தி அனுப்புகிறேன்."
+                Language.HINDI -> "ठीक है, $targetContact को WhatsApp संदेश भेज रहा हूँ।"
+                else -> "Opening WhatsApp for $targetContact."
             }
             return ParsedIntent(
                 intent = ActionIntent.SEND_MESSAGE,
@@ -561,26 +561,26 @@ class MarcoAiEngine {
                 application = "WhatsApp",
                 contactName = targetContact,
                 messageText = msgText,
-                requiresConfirmation = true,
+                requiresConfirmation = false,
                 toolName = "send_message"
             )
         }
 
         // 8. Phone Call (Dynamic Contact Extraction)
-        if (lower.contains("call") || lower.contains("போன்") || lower.contains("அழை") || lower.contains("कॉल") || lower.contains("फोन")) {
+        if (lower.contains("call") || lower.contains("போன்") || lower.contains("அழை") || lower.contains("कॉल") || lower.contains("फोन") || lower.contains("அழைப்பு")) {
             val contact = extractContact(input)
             val targetContact = if (contact.isNotBlank()) contact else "Contact"
             val spoken = when (detectedLang) {
                 Language.TAMIL -> "சரி, $targetContact-க்கு போன் செய்கிறேன்."
                 Language.HINDI -> "ठीक है, $targetContact को कॉल कर रहा हूँ।"
-                else -> "Initiating call to $targetContact."
+                else -> "Calling $targetContact now."
             }
             return ParsedIntent(
                 intent = ActionIntent.MAKE_CALL,
                 detectedLanguage = detectedLang,
                 spokenResponse = spoken,
                 contactName = targetContact,
-                requiresConfirmation = true,
+                requiresConfirmation = false,
                 toolName = "make_call"
             )
         }
@@ -720,12 +720,24 @@ class MarcoAiEngine {
         val lower = input.lowercase()
         val stopWords = listOf(
             "hey marco", "marco", "whatsapp", "message", "send", "a", "call", "dial", "to", "for",
-            "போன்", "கால்", "அனுப்பு", "செய்தி", "பண்ணு", "அழை", "சொல்லு",
+            "போன்", "கால்", "அனுப்பு", "செய்தி", "பண்ணு", "அழை", "சொல்லு", "அழைப்பு",
             "को", "कॉल", "करो", "मैसेज", "भेजो", "संदेश", "saying", "that"
         )
 
+        val cleanRawName = { name: String ->
+            var temp = name.trim()
+            val suffixes = listOf("-க்கு", "க்கு", "-கு", "கு", "ku", "-ku", "ko", "-ko", "ki", "-ki")
+            for (s in suffixes) {
+                if (temp.lowercase().endsWith(s)) {
+                    temp = temp.substring(0, temp.length - s.length).trim()
+                    break
+                }
+            }
+            temp.replace(Regex("[^a-zA-Z0-9\u0B80-\u0BFF\u0900-\u097F]"), "").capitalizeFirstLetter()
+        }
+
         // Try extracting after keywords like "call", "to", "message", "அனுப்பு", "कॉल"
-        val triggerKeywords = listOf("call ", "to ", "message ", "send message to ", "கால் பண்ணு ", "போன் பண்ணு ", "அனுப்பு ", "को ")
+        val triggerKeywords = listOf("call ", "to ", "message ", "send message to ", "கால் பண்ணு ", "போன் பண்ணு ", "அனுப்பு ", "கோ ", "को ")
         for (kw in triggerKeywords) {
             val idx = lower.indexOf(kw)
             if (idx != -1) {
@@ -739,17 +751,19 @@ class MarcoAiEngine {
                     !stopWords.contains(word.lowercase().trim()) && word.length > 1
                 }
                 if (!cleanWord.isNull_Blank()) {
-                    return cleanWord!!.replace(Regex("[^a-zA-Z0-9\u0B80-\u0BFF\u0900-\u097F]"), "").capitalizeFirstLetter()
+                    val finalName = cleanRawName(cleanWord!!)
+                    if (finalName.isNotBlank()) return finalName
                 }
             }
         }
 
-        // Fallback: search for any non-stopword capitalized or distinct token
+        // Fallback: search for any non-stopword token
         val words = input.split(" ")
         for (w in words) {
-            val clean = w.replace(Regex("[^a-zA-Z0-9\u0B80-\u0BFF\u0900-\u097F]"), "")
+            val clean = w.replace(Regex("[^a-zA-Z0-9\u0B80-\u0BFF\u0900-\u097F-]"), "")
             if (clean.length > 2 && !stopWords.contains(clean.lowercase())) {
-                return clean.capitalizeFirstLetter()
+                val finalName = cleanRawName(clean)
+                if (finalName.isNotBlank()) return finalName
             }
         }
         return "Contact"
