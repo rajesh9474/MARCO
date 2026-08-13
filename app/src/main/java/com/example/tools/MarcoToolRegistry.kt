@@ -14,7 +14,12 @@ import com.example.data.ToolResult
 
 class MarcoToolRegistry(private val context: Context) {
 
+    init {
+        MarcoLogger.init(context)
+    }
+
     private val commandHandler = MarcoCommandHandler(context)
+    private val appIntentHandler = AppIntentHandler(context)
 
     fun getAllTools(): List<ToolInfo> = listOf(
         ToolInfo(
@@ -227,27 +232,7 @@ class MarcoToolRegistry(private val context: Context) {
     }
 
     private fun makePhoneCall(contact: String): ToolResult {
-        return try {
-            val intent = if (contact.matches(Regex("^[0-9+ -]+$"))) {
-                Intent(Intent.ACTION_DIAL, Uri.parse("tel:$contact"))
-            } else {
-                Intent(Intent.ACTION_VIEW, ContactsContract.Contacts.CONTENT_URI)
-            }
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
-            ToolResult(
-                success = true,
-                message = "Opened dialer for contact '$contact'.",
-                actionExecuted = "Phone Call Initiated",
-                details = mapOf("contact" to contact)
-            )
-        } catch (e: Exception) {
-            ToolResult(
-                success = false,
-                message = "Could not open dialer: ${e.localizedMessage}",
-                actionExecuted = "Call Failed"
-            )
-        }
+        return appIntentHandler.openDialerWithContactOrNumber(contact)
     }
 
     private fun playOrControlMedia(command: String): ToolResult {
@@ -525,6 +510,9 @@ class MarcoToolRegistry(private val context: Context) {
     }
 
     private fun executeFallbackIntent(parsedIntent: ParsedIntent): ToolResult {
+        if (parsedIntent.intent == com.example.data.ActionIntent.MAKE_CALL) {
+            return appIntentHandler.handleParsedIntent(parsedIntent)
+        }
         return ToolResult(
             success = true,
             message = parsedIntent.spokenResponse,

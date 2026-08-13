@@ -87,6 +87,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.shouldShowRationale
 import com.example.data.AssistantState
 import com.example.data.Language
 import com.example.ui.MarcoViewModel
@@ -101,12 +105,16 @@ import com.example.ui.theme.MarcoTextMuted
 import com.example.ui.theme.MarcoTextPrimary
 import com.example.ui.theme.MarcoTextSecondary
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalPermissionsApi::class)
 @Composable
 fun MarcoHomeScreen(
     viewModel: MarcoViewModel,
     modifier: Modifier = Modifier
 ) {
+    val micPermissionState = rememberPermissionState(
+        permission = android.Manifest.permission.RECORD_AUDIO
+    )
+
     val assistantState by viewModel.assistantState.collectAsState()
     val preferredLanguage by viewModel.preferredLanguage.collectAsState()
     val currentPrompt by viewModel.currentPrompt.collectAsState()
@@ -121,6 +129,14 @@ fun MarcoHomeScreen(
     val isOnline by viewModel.isOnline.collectAsState()
 
     var typedInput by remember { mutableStateOf("") }
+
+    val handleMicToggle = {
+        if (micPermissionState.status.isGranted) {
+            if (isListening) viewModel.stopListening() else viewModel.startListening()
+        } else {
+            micPermissionState.launchPermissionRequest()
+        }
+    }
 
     val quickActions = remember {
         listOf(
@@ -235,6 +251,11 @@ fun MarcoHomeScreen(
                     }
                 }
 
+                // Microphone Permission Banner (Accompanist Permissions)
+                item {
+                    MicPermissionBanner(permissionState = micPermissionState)
+                }
+
                 // Offline Network Alert Banner
                 if (!isOnline) {
                     item {
@@ -307,9 +328,7 @@ fun MarcoHomeScreen(
                         isListening = isListening,
                         isSpeaking = isSpeaking,
                         rmsDb = rmsDb,
-                        onOrbClick = {
-                            if (isListening) viewModel.stopListening() else viewModel.startListening()
-                        }
+                        onOrbClick = handleMicToggle
                     )
                 }
 
@@ -908,9 +927,7 @@ fun MarcoHomeScreen(
                         }
                     } else {
                         IconButton(
-                            onClick = {
-                                if (isListening) viewModel.stopListening() else viewModel.startListening()
-                            },
+                            onClick = handleMicToggle,
                             modifier = Modifier
                                 .size(48.dp)
                                 .clip(CircleShape)
@@ -1318,6 +1335,71 @@ fun RealtimeListeningWaveform(
                             cap = androidx.compose.ui.graphics.StrokeCap.Round
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Accompanist Permissions Banner for requesting and managing RECORD_AUDIO permission at runtime.
+ */
+@OptIn(ExperimentalPermissionsApi::class)
+@Composable
+fun MicPermissionBanner(
+    permissionState: com.google.accompanist.permissions.PermissionState
+) {
+    if (!permissionState.status.isGranted) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("mic_permission_card"),
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF31101E)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MarcoPinkAccent)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.MicOff,
+                        contentDescription = "Microphone Access Required",
+                        tint = MarcoPinkAccent,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Microphone Access Required",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (permissionState.status.shouldShowRationale) {
+                                "Microphone permission is required for MARCO to detect the 'Hey MARCO' wake-word and convert your voice into commands."
+                            } else {
+                                "Grant RECORD_AUDIO permission to enable voice recognition and assistant capabilities."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFFCA5A5)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Button(
+                    onClick = { permissionState.launchPermissionRequest() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MarcoPinkAccent),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("grant_mic_permission_button")
+                ) {
+                    Icon(Icons.Default.Mic, contentDescription = null, tint = Color.Black)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Grant Microphone Permission",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = Color.Black
+                    )
                 }
             }
         }

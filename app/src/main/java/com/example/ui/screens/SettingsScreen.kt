@@ -46,9 +46,14 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.unit.sp
+import com.example.tools.MarcoLogger
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import com.example.data.FirebaseAuthManager
 import com.example.data.Language
 import com.example.ui.MarcoViewModel
@@ -600,6 +605,96 @@ fun SettingsScreen(
                             .testTag("request_permissions_button")
                     ) {
                         Text("Grant Required Permissions", color = androidx.compose.ui.graphics.Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        // Centralized Timber Execution Logs Debugger Card
+        item {
+            var logText by remember { mutableStateOf(MarcoLogger.getLogs(context)) }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MarcoCardSurface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.BugReport,
+                                contentDescription = null,
+                                tint = MarcoCyanPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Timber Execution Error Logs",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MarcoCyanPrimary
+                            )
+                        }
+                        Row {
+                            IconButton(
+                                onClick = { logText = MarcoLogger.getLogs(context) },
+                                modifier = Modifier.testTag("refresh_logs_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Refresh Logs",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    MarcoLogger.clearLogs(context)
+                                    logText = MarcoLogger.getLogs(context)
+                                },
+                                modifier = Modifier.testTag("clear_logs_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Clear Logs",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "Persisted local errors from intent handlers and voice commands (marco_intent_errors.log):",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MarcoTextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = androidx.compose.ui.graphics.Color(0xFF0F172A),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp)
+                    ) {
+                        LazyColumn(
+                            modifier = Modifier.padding(8.dp)
+                        ) {
+                            item {
+                                Text(
+                                    text = logText,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        fontSize = 11.sp
+                                    ),
+                                    color = androidx.compose.ui.graphics.Color(0xFFE2E8F0)
+                                )
+                            }
+                        }
                     }
                 }
             }
