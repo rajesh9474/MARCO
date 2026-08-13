@@ -20,6 +20,8 @@ class MarcoCommandHandler(private val context: Context) {
     private val knownAppPackages = mapOf(
         "whatsapp" to "com.whatsapp",
         "youtube" to "com.google.android.youtube",
+        "youtube music" to "com.google.android.apps.youtube.music",
+        "yt music" to "com.google.android.apps.youtube.music",
         "instagram" to "com.instagram.android",
         "facebook" to "com.facebook.katana",
         "chrome" to "com.android.chrome",
@@ -33,6 +35,14 @@ class MarcoCommandHandler(private val context: Context) {
         "files" to "com.google.android.apps.nbu.files",
         "clock" to "com.google.android.deskclock",
         "calendar" to "com.google.android.calendar",
+        "tasks" to "com.google.android.apps.tasks",
+        "google tasks" to "com.google.android.apps.tasks",
+        "home" to "com.google.android.apps.chromecast.app",
+        "google home" to "com.google.android.apps.chromecast.app",
+        "keep" to "com.google.android.keep",
+        "notes" to "com.google.android.keep",
+        "messages" to "com.google.android.apps.messaging",
+        "message" to "com.google.android.apps.messaging",
         "snapchat" to "com.snapchat.android",
         "telegram" to "org.telegram.messenger",
         "twitter" to "com.twitter.android",
@@ -91,6 +101,25 @@ class MarcoCommandHandler(private val context: Context) {
 
     fun handleOpenAppIntent(appName: String): ToolResult {
         val lower = appName.trim().lowercase()
+
+        // 0. Explicit YouTube Handler
+        if (lower == "youtube" || (lower.contains("youtube") && !lower.contains("music"))) {
+            val pm = context.packageManager
+            val launchIntent = pm.getLaunchIntentForPackage("com.google.android.youtube")
+            if (launchIntent != null) {
+                return executeLaunchIntent(launchIntent, "YouTube", "com.google.android.youtube")
+            } else {
+                return try {
+                    val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com")).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(webIntent)
+                    ToolResult(true, "Opened YouTube.", "Launch YouTube Web")
+                } catch (e: Exception) {
+                    ToolResult(false, "Could not open YouTube.", "Launch Failed")
+                }
+            }
+        }
 
         // 1. Check special system category intents
         if (lower.contains("camera")) {

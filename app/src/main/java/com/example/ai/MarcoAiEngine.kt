@@ -89,6 +89,11 @@ class MarcoAiEngine {
             User input: "$input"
             Preferred output language setting: "${preferredLanguage.name}"
 
+            CRITICAL INTENT RULES FOR APPS & MEDIA:
+            - If user asks to open an app like 'open youtube', 'launch youtube', 'open whatsapp', 'open chrome' (WITHOUT asking to search or play a specific video/song query), intent MUST be "OPEN_APP", application MUST be the app name (e.g. "YouTube"), and tool_name MUST be "open_app".
+            - ONLY use "PLAY_MEDIA" or "search_youtube" if the user explicitly requests to search or play a specific video, song, artist, or topic (e.g. 'play A.R. Rahman on youtube', 'search youtube for cooking').
+            - NEVER default empty search queries to "Tamil songs" or force media playback when user simply wants to open an app.
+
             Respond strictly in valid JSON format with keys:
             {
               "detected_language": "TAMIL" | "ENGLISH" | "HINDI" | "MIXED",
@@ -102,7 +107,7 @@ class MarcoAiEngine {
               "setting_name": string or null,
               "setting_value": string or null,
               "requires_confirmation": false,
-              "tool_name": "search_youtube" | "open_app" | "play_media" | "send_message" | "make_call" | "reminder" | "browser_search" | "maps_navigation" | "device_settings" | "calculator" | "weather" | "camera" | "device_info" | "flashlight" | "translate" | "none",
+              "tool_name": "search_youtube" | "open_app" | "play_media" | "send_message" | "make_call" | "reminder" | "set_timer" | "set_alarm" | "compose_email" | "youtube_music" | "smart_home" | "google_tasks" | "browser_search" | "maps_navigation" | "device_settings" | "calculator" | "weather" | "camera" | "device_info" | "flashlight" | "translate" | "none",
               "spoken_response": "Polished, highly intelligent, direct JARVIS-style response in the target language (Tamil, English, or Hindi) answering the query completely."
             }
         """.trimIndent()
@@ -496,21 +501,42 @@ class MarcoAiEngine {
             )
         }
 
-        // 5. YouTube & Song queries
-        if (lower.contains("youtube") || lower.contains("song") || lower.contains("பாட்டு") || lower.contains("பாடல") || lower.contains("காணொளி") || lower.contains("गाना") || lower.contains("संगीत")) {
+        // 5. App Openers (Dynamic App Name Resolution - e.g. "open youtube", "open whatsapp", "launch chrome")
+        if (lower.contains("open") || lower.contains("திற") || lower.contains("खोलो") || lower.contains("திறப்பாயாக") || lower.contains("launch")) {
+            val hasExplicitSearchOrPlay = lower.contains("play") || lower.contains("search") || lower.contains("போடு") || lower.contains("தேடு") || lower.contains("गाना") || lower.contains("बजाओ") || lower.contains("கீதம்") || lower.contains("பாட்டு")
+            if (!hasExplicitSearchOrPlay) {
+                val app = extractAppName(input)
+                val spoken = when (detectedLang) {
+                    Language.TAMIL -> "சரி, $app செயலியை திறக்கிறேன்."
+                    Language.HINDI -> "ठीक है, $app खोल रहा हूँ।"
+                    else -> "Opening $app application."
+                }
+                return ParsedIntent(
+                    intent = ActionIntent.OPEN_APP,
+                    detectedLanguage = detectedLang,
+                    spokenResponse = spoken,
+                    application = app,
+                    toolName = if (app.equals("Camera", ignoreCase = true)) "camera" else "open_app"
+                )
+            }
+        }
+
+        // 6. YouTube & Song / Media queries
+        if (lower.contains("youtube") || lower.contains("song") || lower.contains("பாட்டு") || lower.contains("பாடல") || lower.contains("காணொளி") || lower.contains("गाना") || lower.contains("संगीत") || lower.contains("play")) {
             val query = extractSongQuery(input)
+            val hasQuery = query.isNotBlank()
             val spoken = when (detectedLang) {
-                Language.TAMIL -> "சரி, YouTube-ல் ${if (query.isNotBlank()) query else "தமிழ் பாடலை"} இயக்குகிறேன்."
-                Language.HINDI -> "ठीक है, मैं YouTube खोलकर ${if (query.isNotBlank()) query else "तमिल गाना"} चला रहा हूँ।"
-                else -> "Opening YouTube and searching for ${if (query.isNotBlank()) query else "songs"}."
+                Language.TAMIL -> if (hasQuery) "சரி, YouTube-ல் '$query' இயக்குகிறேன்." else "சரி, YouTube செயலியை திறக்கிறேன்."
+                Language.HINDI -> if (hasQuery) "ठीक है, YouTube पर '$query' चला रहा हूँ।" else "ठीक है, YouTube खोल रहा हूँ।"
+                else -> if (hasQuery) "Opening YouTube and searching for '$query'." else "Opening YouTube application."
             }
             return ParsedIntent(
-                intent = ActionIntent.PLAY_MEDIA,
+                intent = if (hasQuery) ActionIntent.PLAY_MEDIA else ActionIntent.OPEN_APP,
                 detectedLanguage = detectedLang,
                 spokenResponse = spoken,
                 application = "YouTube",
-                searchQuery = if (query.isNotBlank()) query else "Tamil songs",
-                toolName = "search_youtube"
+                searchQuery = query,
+                toolName = if (hasQuery) "search_youtube" else "open_app"
             )
         }
 
@@ -602,19 +628,83 @@ class MarcoAiEngine {
             )
         }
 
-        // 9. Reminder / Alarm
-        if (lower.contains("reminder") || lower.contains("எழுப்பு") || lower.contains("நினைவூட்டு") || lower.contains("याद") || lower.contains("अलार्म")) {
+        // 9. Reminder / Timer / Alarm / Email / Smart Home
+        if (lower.contains("timer") || lower.contains("டைமர்") || lower.contains("टाइमर")) {
             val spoken = when (detectedLang) {
-                Language.TAMIL -> "சரி, காலை 7 மணிக்கு நினைவூட்டல் அமைக்கப்பட்ட‌து."
-                Language.HINDI -> "ठीक है, सुबह 7 बजे के लिए रिमाइंडर सेट कर दिया है।"
-                else -> "Alarm and reminder set for 7:00 AM."
+                Language.TAMIL -> "சரி, டைமர் அமைக்கப்படுகிறது."
+                Language.HINDI -> "ठीक है, टाइमर सेट किया जा रहा है।"
+                else -> "Setting timer on your device."
+            }
+            return ParsedIntent(
+                intent = ActionIntent.CREATE_REMINDER,
+                detectedLanguage = detectedLang,
+                spokenResponse = spoken,
+                searchQuery = input,
+                toolName = "set_timer"
+            )
+        }
+
+        if (lower.contains("alarm") || lower.contains("அலாரம்")) {
+            val spoken = when (detectedLang) {
+                Language.TAMIL -> "சரி, அலாரம் அமைக்கப்படுகிறது."
+                Language.HINDI -> "ठीक है, अलार्म लगाया जा रहा है।"
+                else -> "Setting alarm on clock app."
+            }
+            return ParsedIntent(
+                intent = ActionIntent.CREATE_REMINDER,
+                detectedLanguage = detectedLang,
+                spokenResponse = spoken,
+                timeStr = "06:30",
+                toolName = "set_alarm"
+            )
+        }
+
+        if (lower.contains("email") || lower.contains("gmail") || lower.contains("மின்னஞ்சல்") || lower.contains("ईमेल")) {
+            val contact = extractContact(input)
+            val msg = extractMessageText(input)
+            val spoken = when (detectedLang) {
+                Language.TAMIL -> "சரி, $contact-க்கு மின்னஞ்சல் உருவாக்கப்படுகிறது."
+                Language.HINDI -> "ठीक है, $contact के लिए ईमेल बनाया जा रहा है।"
+                else -> "Opening Gmail compose for $contact."
+            }
+            return ParsedIntent(
+                intent = ActionIntent.SEND_MESSAGE,
+                detectedLanguage = detectedLang,
+                spokenResponse = spoken,
+                contactName = contact,
+                messageText = msg,
+                toolName = "compose_email"
+            )
+        }
+
+        if (lower.contains("light") || lower.contains("smart home") || lower.contains("thermostat") || lower.contains("ஸ்மார்ட் ஹோம்") || lower.contains("लाइट")) {
+            val spoken = when (detectedLang) {
+                Language.TAMIL -> "சரி, கூகுள் ஹோம் ஸ்மார்ட் ஹோம் சாதனம் கட்டுப்படுத்தப்படுகிறது."
+                Language.HINDI -> "ठीक है, स्मार्ट होम डिवाइस को नियंत्रित किया जा रहा है।"
+                else -> "Triggering Smart Home control via Google Home."
+            }
+            return ParsedIntent(
+                intent = ActionIntent.DEVICE_SETTING,
+                detectedLanguage = detectedLang,
+                spokenResponse = spoken,
+                settingName = "lights",
+                settingValue = "on",
+                toolName = "smart_home"
+            )
+        }
+
+        if (lower.contains("reminder") || lower.contains("எழுப்பு") || lower.contains("நினைவூட்டு") || lower.contains("याद") || lower.contains("task") || lower.contains("calendar")) {
+            val spoken = when (detectedLang) {
+                Language.TAMIL -> "சரி, காலெண்டரில் நினைவுறுத்தல்/நிகழ்வு அமைக்கப்பட்டது."
+                Language.HINDI -> "ठीक है, कैलेंडर में इवेंट जोड़ा जा रहा है।"
+                else -> "Event and reminder added to Calendar and Tasks."
             }
             return ParsedIntent(
                 intent = ActionIntent.CREATE_REMINDER,
                 detectedLanguage = detectedLang,
                 spokenResponse = spoken,
                 timeStr = "7:00 AM",
-                toolName = "reminder"
+                toolName = "google_tasks"
             )
         }
 
@@ -711,9 +801,9 @@ class MarcoAiEngine {
     }
 
     private fun extractSongQuery(input: String): String {
-        var clean = input.replace(Regex("(?i)hey marco|marco|youtube|open|play|போடு|இயக்கு|கீதம்|பாட்டு|பாடலை|பாடல்|खोलो|बजाओ|गाना|चलाओ|கொண்டு போ|பண்ணு|and"), "").trim()
+        var clean = input.replace(Regex("(?i)hey marco|marco|youtube music|youtube|yt music|open app|open|launch|play|search|போடு|இயக்கு|கீதம்|பாட்டு|பாடலை|பாடல்|காணொளி|தேடு|खोलो|बजाओ|गाना|संगीत|चलाओ|கொண்டு போ|பண்ணு|and|for|on"), "").trim()
         clean = clean.replace(Regex("^[., -]+|[., -]+$"), "")
-        return if (clean.isBlank()) "Tamil song" else clean
+        return clean
     }
 
     private fun extractContact(input: String): String {

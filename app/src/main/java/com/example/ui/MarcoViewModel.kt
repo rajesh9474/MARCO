@@ -47,6 +47,10 @@ class MarcoViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = application.getSharedPreferences("marco_theme_prefs", android.content.Context.MODE_PRIVATE)
 
+    init {
+        FirebaseAuthManager.instance.init(application)
+    }
+
     private val _themeMode = MutableStateFlow(
         ThemeMode.entries.firstOrNull { it.name == prefs.getString("theme_mode", ThemeMode.SYSTEM.name) } ?: ThemeMode.SYSTEM
     )
@@ -198,6 +202,7 @@ class MarcoViewModel(application: Application) : AndroidViewModel(application) {
             speechToText.finalText.collectLatest { text ->
                 if (!text.isNull_Blank()) {
                     val rawText = text!!
+                    speechToText.clearResult()
                     if (WakeWordDetector.containsWakeWord(rawText)) {
                         val command = WakeWordDetector.extractCommandAfterWakeWord(rawText)
                         val effectivePrompt = if (command.isNotBlank()) command else rawText
@@ -233,13 +238,41 @@ class MarcoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    val voiceMatchManager = com.example.voice.SpeakerVoiceMatchManager.getInstance(application)
+    val isVoiceMatchEnabled: StateFlow<Boolean> = voiceMatchManager.isVoiceMatchEnabled
+    val isVoiceProfileEnrolled: StateFlow<Boolean> = voiceMatchManager.isProfileEnrolled
+    val enrolledPitchHz: StateFlow<Float> = voiceMatchManager.enrolledPitchHz
+
     fun setContinuousWakeWord(enabled: Boolean) {
         speechToText.setContinuousWakeWord(enabled)
         if (enabled) {
             localKeywordSpotter.startSpotting()
+            toggleBackgroundService(true)
         } else {
             localKeywordSpotter.stopSpotting()
+            toggleBackgroundService(false)
         }
+    }
+
+    fun toggleBackgroundService(enabled: Boolean) {
+        _isBackgroundActive.value = enabled
+        if (enabled) {
+            MarcoForegroundService.start(getApplication())
+        } else {
+            MarcoForegroundService.stop(getApplication())
+        }
+    }
+
+    fun setVoiceMatchEnabled(enabled: Boolean) {
+        voiceMatchManager.setVoiceMatchEnabled(enabled)
+    }
+
+    fun enrollVoiceSample(pcmBuffer: ShortArray): Boolean {
+        return voiceMatchManager.enrollVoiceProfile(pcmBuffer)
+    }
+
+    fun resetVoiceProfile() {
+        voiceMatchManager.resetVoiceProfile()
     }
 
     fun setKwsSensitivity(sensitivity: Float) {

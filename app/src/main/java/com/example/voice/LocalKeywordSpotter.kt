@@ -40,6 +40,8 @@ class LocalKeywordSpotter(private val context: Context) {
     private val _kwsSensitivity = MutableStateFlow(0.75f) // 0.0 to 1.0
     val kwsSensitivity: StateFlow<Float> = _kwsSensitivity.asStateFlow()
 
+    private val voiceMatchManager = SpeakerVoiceMatchManager.getInstance(context)
+
     var onKeywordDetectedListener: ((String) -> Unit)? = null
 
     fun setSensitivity(value: Float) {
@@ -133,10 +135,17 @@ class LocalKeywordSpotter(private val context: Context) {
 
                             // Analyze acoustic energy curve for double-syllable "Hey Mar-co" acoustic envelope
                             if (detectHeyMarcoEnvelope(energyWindow, _kwsSensitivity.value)) {
-                                _lastSpottedKeyword.value = "Hey Marco"
-                                onKeywordDetectedListener?.invoke("Hey Marco")
-                                energyWindow.clear()
-                                delay(1500) // Cooldown period to prevent multiple triggers
+                                val (isMatch, confidence) = voiceMatchManager.verifySpeaker(shortBuffer, sampleRate)
+                                if (isMatch) {
+                                    _lastSpottedKeyword.value = "Hey Marco"
+                                    onKeywordDetectedListener?.invoke("Hey Marco")
+                                    energyWindow.clear()
+                                    delay(1500) // Cooldown period to prevent multiple triggers
+                                } else {
+                                    // Rejected due to Voice Match speaker mismatch
+                                    energyWindow.clear()
+                                    delay(500)
+                                }
                             }
                         }
                     } else {

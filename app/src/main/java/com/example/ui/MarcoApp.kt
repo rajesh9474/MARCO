@@ -49,11 +49,26 @@ sealed class NavScreen(val route: String, val title: String, val icon: ImageVect
 
 @Composable
 fun MarcoApp(
-    viewModel: MarcoViewModel = viewModel()
+    viewModel: MarcoViewModel = viewModel(),
+    autoStartVoiceListening: Boolean = false,
+    onVoiceListeningHandled: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: NavScreen.Home.route
+
+    androidx.compose.runtime.LaunchedEffect(autoStartVoiceListening) {
+        if (autoStartVoiceListening) {
+            navController.navigate(NavScreen.Home.route) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+            }
+            viewModel.startListening()
+            onVoiceListeningHandled()
+        }
+    }
 
     val themeMode by viewModel.themeMode.collectAsState()
     val isSystemDark = isSystemInDarkTheme()

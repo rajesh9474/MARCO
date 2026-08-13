@@ -17,14 +17,15 @@ data class FirestoreChatMessage(
 
 class FirestoreManager private constructor() {
 
-    private val firestore: FirebaseFirestore? by lazy {
-        try {
-            FirebaseFirestore.getInstance()
-        } catch (e: Exception) {
-            Log.e("FirestoreManager", "Firestore init error: ${e.message}")
-            null
+    private val firestore: FirebaseFirestore?
+        get() {
+            return try {
+                FirebaseFirestore.getInstance()
+            } catch (e: Exception) {
+                Log.d("FirestoreManager", "Firestore not available: ${e.message}")
+                null
+            }
         }
-    }
 
     suspend fun saveChatMessage(userId: String, sender: String, text: String, modelUsed: String = "gemini-3.5-flash") = withContext(Dispatchers.IO) {
         if (userId.isBlank()) return@withContext

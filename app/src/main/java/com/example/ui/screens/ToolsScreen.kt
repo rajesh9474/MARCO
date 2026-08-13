@@ -62,7 +62,7 @@ fun ToolsScreen(
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
-            text = "13 integrated device tools supporting Tamil, English, and Hindi commands",
+            text = "${tools.size} integrated device & Google Assistant tools supporting Tamil, English, and Hindi commands",
             style = MaterialTheme.typography.bodySmall,
             color = MarcoTextSecondary
         )

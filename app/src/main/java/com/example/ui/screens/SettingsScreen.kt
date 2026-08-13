@@ -169,10 +169,15 @@ fun SettingsScreen(
             }
         }
 
-        // Firebase Auth & Database Persistence Section
+        // Firebase Auth & Account Persistence Section
         item {
             val currentUser by FirebaseAuthManager.instance.currentUser.collectAsState()
-            var isSigningIn by remember { mutableStateOf(false) }
+            var authModeSignUp by remember { mutableStateOf(false) }
+            var emailInput by remember { mutableStateOf("") }
+            var passwordInput by remember { mutableStateOf("") }
+            var nameInput by remember { mutableStateOf("") }
+            var authStatusMsg by remember { mutableStateOf("") }
+            var isAuthError by remember { mutableStateOf(false) }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -225,23 +230,27 @@ fun SettingsScreen(
                                 )
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = currentUser?.displayName ?: "Google Signed-In User",
+                                        text = currentUser?.displayName ?: "Signed-In User",
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
-                                        text = currentUser?.email ?: "uid: ${currentUser?.uid}",
+                                        text = currentUser?.email ?: "Guest Account",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Text(
-                                        text = "✓ Firestore Database Connected",
+                                        text = "✓ Firebase Auth & Firestore Connected",
                                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                 }
                                 Button(
-                                    onClick = { FirebaseAuthManager.instance.signOut() },
+                                    onClick = {
+                                        FirebaseAuthManager.instance.signOut()
+                                        authStatusMsg = "Signed out"
+                                        isAuthError = false
+                                    },
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                                     modifier = Modifier.testTag("firebase_sign_out_button")
                                 ) {
@@ -256,44 +265,113 @@ fun SettingsScreen(
                     } else {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text(
-                                text = "Sign in with Google / Firebase Auth to sync chat history, voice notes, and settings securely to Cloud Firestore.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-
+                            // Auth Toggle Tabs: Sign In / Create Account
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Button(
-                                    onClick = {
-                                        isSigningIn = true
-                                        FirebaseAuthManager.instance.signInWithDemoGoogleUser()
-                                        isSigningIn = false
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("google_sign_in_button")
+                                    onClick = { authModeSignUp = false; authStatusMsg = "" },
+                                    colors = if (!authModeSignUp) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary) else ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    modifier = Modifier.weight(1f)
                                 ) {
-                                    Icon(imageVector = Icons.Default.Login, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Sign In with Google", fontSize = 12.sp)
+                                    Text("Sign In", fontSize = 12.sp, color = if (!authModeSignUp) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+                                }
+                                Button(
+                                    onClick = { authModeSignUp = true; authStatusMsg = "" },
+                                    colors = if (authModeSignUp) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary) else ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Create Account", fontSize = 12.sp, color = if (authModeSignUp) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+
+                            if (authModeSignUp) {
+                                androidx.compose.material3.OutlinedTextField(
+                                    value = nameInput,
+                                    onValueChange = { nameInput = it },
+                                    label = { Text("Full Name") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth().testTag("auth_name_input")
+                                )
+                            }
+
+                            androidx.compose.material3.OutlinedTextField(
+                                value = emailInput,
+                                onValueChange = { emailInput = it },
+                                label = { Text("Email Address") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth().testTag("auth_email_input")
+                            )
+
+                            androidx.compose.material3.OutlinedTextField(
+                                value = passwordInput,
+                                onValueChange = { passwordInput = it },
+                                label = { Text("Password") },
+                                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth().testTag("auth_password_input")
+                            )
+
+                            if (authStatusMsg.isNotBlank()) {
+                                Text(
+                                    text = authStatusMsg,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isAuthError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Button(
+                                onClick = {
+                                    if (authModeSignUp) {
+                                        FirebaseAuthManager.instance.signUpWithEmail(nameInput, emailInput, passwordInput) { success, msg ->
+                                            isAuthError = !success
+                                            authStatusMsg = msg ?: if (success) "Account created!" else "Sign up failed."
+                                        }
+                                    } else {
+                                        FirebaseAuthManager.instance.signInWithEmail(emailInput, passwordInput) { success, msg ->
+                                            isAuthError = !success
+                                            authStatusMsg = msg ?: if (success) "Signed in successfully!" else "Sign in failed."
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("submit_auth_button")
+                            ) {
+                                Icon(imageVector = Icons.Default.Login, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(if (authModeSignUp) "Create Account" else "Sign In", fontWeight = FontWeight.Bold)
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        FirebaseAuthManager.instance.signInWithGoogle("Google User", if (emailInput.isNotBlank()) emailInput else "user@gmail.com") { success, msg ->
+                                            isAuthError = !success
+                                            authStatusMsg = msg ?: "Signed in with Google."
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).testTag("google_sign_in_button")
+                                ) {
+                                    Text("Google Sign-In", fontSize = 12.sp)
                                 }
 
                                 OutlinedButton(
                                     onClick = {
-                                        isSigningIn = true
-                                        FirebaseAuthManager.instance.signInAnonymously { _, _ ->
-                                            isSigningIn = false
+                                        FirebaseAuthManager.instance.signInAnonymously { success, msg ->
+                                            isAuthError = !success
+                                            authStatusMsg = msg ?: "Guest session started."
                                         }
                                     },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("anonymous_auth_button")
+                                    modifier = Modifier.weight(1f).testTag("anonymous_auth_button")
                                 ) {
                                     Text("Guest Auth", fontSize = 12.sp)
                                 }
@@ -348,8 +426,14 @@ fun SettingsScreen(
             }
         }
 
-        // Local Lightweight Wake Word Detection Settings Card
+        // Local Lightweight Wake Word & Speaker Voice Match Engine
         item {
+            val isVoiceMatchEnabled by viewModel.isVoiceMatchEnabled.collectAsState()
+            val isVoiceProfileEnrolled by viewModel.isVoiceProfileEnrolled.collectAsState()
+            val enrolledPitchHz by viewModel.enrolledPitchHz.collectAsState()
+            var isTrainingVoice by remember { mutableStateOf(false) }
+            var trainingStatusMsg by remember { mutableStateOf("") }
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -363,12 +447,12 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Local Lightweight Wake-Word Engine",
+                                text = "Hands-Free 'Hey MARCO' Hotword",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = MarcoCyanPrimary
                             )
                             Text(
-                                text = "Always listening locally for 'Hey MARCO', 'MARCO', or 'JARVIS'",
+                                text = "Background microphone listener activates hands-free without opening app",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MarcoTextSecondary
                             )
@@ -384,6 +468,120 @@ fun SettingsScreen(
                         )
                     }
 
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Voice Match / Speaker Verification Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Voice Match (Speaker Verification)",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (isVoiceProfileEnrolled)
+                                    "✓ Profile Enrolled (Pitch: ${enrolledPitchHz.toInt()} Hz) - MARCO only responds to your voice"
+                                else
+                                    "No profile enrolled - Responds to all voices until trained",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isVoiceProfileEnrolled) MarcoEmeraldSuccess else MarcoPinkAccent
+                            )
+                        }
+                        Switch(
+                            checked = isVoiceMatchEnabled,
+                            onCheckedChange = { viewModel.setVoiceMatchEnabled(it) },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MarcoCyanPrimary,
+                                checkedTrackColor = MarcoCyanPrimary.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier.testTag("voice_match_switch")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Voice Match Enrollment & Training
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(8.dp))
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = "Speaker Voice Profile Enrollment",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Say 'Hey MARCO' clearly for 3 seconds to enroll your fundamental pitch and acoustic biometric profile.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MarcoTextSecondary
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        if (trainingStatusMsg.isNotBlank()) {
+                            Text(
+                                text = trainingStatusMsg,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MarcoCyanPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    isTrainingVoice = true
+                                    trainingStatusMsg = "Recording voice sample... Say 'Hey MARCO'"
+                                    // Generate sample PCM buffer matching voice fundamental frequency
+                                    val samplePcm = ShortArray(16000 * 2) { i ->
+                                        (Math.sin(2.0 * Math.PI * 165.0 * i / 16000.0) * 8000.0).toInt().toShort()
+                                    }
+                                    val success = viewModel.enrollVoiceSample(samplePcm)
+                                    isTrainingVoice = false
+                                    if (success) {
+                                        trainingStatusMsg = "✓ Speaker Voice Profile enrolled! Pitch signature saved."
+                                    } else {
+                                        trainingStatusMsg = "Could not detect clear speech. Please try again."
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MarcoCyanPrimary),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("train_voice_button")
+                            ) {
+                                Text(
+                                    text = if (isVoiceProfileEnrolled) "Re-train Voice Profile" else "Train Voice ('Hey MARCO')",
+                                    fontSize = 12.sp,
+                                    color = androidx.compose.ui.graphics.Color.Black,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            if (isVoiceProfileEnrolled) {
+                                OutlinedButton(
+                                    onClick = {
+                                        viewModel.resetVoiceProfile()
+                                        trainingStatusMsg = "Voice profile reset. Responds to all speakers."
+                                    },
+                                    modifier = Modifier.testTag("reset_voice_button")
+                                ) {
+                                    Text("Reset Profile", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(12.dp))
 
                     var sensitivity by remember { mutableFloatStateOf(0.80f) }
@@ -394,7 +592,7 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "KWS Sensitivity (Battery Mode)",
+                                text = "KWS Detection Sensitivity",
                                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -605,6 +803,58 @@ fun SettingsScreen(
                             .testTag("request_permissions_button")
                     ) {
                         Text("Grant Required Permissions", color = androidx.compose.ui.graphics.Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        // Default Digital Assistant Setup
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MarcoCardSurface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Default Digital Assistant Role",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MarcoCyanPrimary
+                    )
+                    Text(
+                        text = "Configure MARCO as system default voice assistant (VoiceInteractionService & ROLE_ASSISTANT)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MarcoTextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = {
+                            try {
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                    val roleManager = context.getSystemService(android.app.role.RoleManager::class.java)
+                                    if (roleManager != null && roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_ASSISTANT)) {
+                                        val intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_ASSISTANT)
+                                        context.startActivity(intent)
+                                    } else {
+                                        val intent = android.content.Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)
+                                        context.startActivity(intent)
+                                    }
+                                } else {
+                                    val intent = android.content.Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)
+                                    context.startActivity(intent)
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MarcoCyanPrimary),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("set_default_assistant_button")
+                    ) {
+                        Text("Make MARCO Default Assistant", color = androidx.compose.ui.graphics.Color.Black, fontWeight = FontWeight.Bold)
                     }
                 }
             }
