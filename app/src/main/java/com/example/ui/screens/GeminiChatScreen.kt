@@ -78,6 +78,7 @@ fun GeminiChatScreen(
     val selectedModel by viewModel.selectedGeminiModel.collectAsState()
     val isHighThinkingEnabled by viewModel.isHighThinkingEnabled.collectAsState()
     val currentUser by FirebaseAuthManager.instance.currentUser.collectAsState()
+    val isApiKeyConfigured by viewModel.isApiKeyConfigured.collectAsState()
 
     var inputText by remember { mutableStateOf("") }
     var showRoleMenu by remember { mutableStateOf(false) }
@@ -277,6 +278,35 @@ fun GeminiChatScreen(
                             Text("View / Edit System Instruction", fontSize = 12.sp)
                         }
                     }
+                }
+            }
+        }
+
+        // API Key Missing Warning Banner
+        if (!isApiKeyConfigured) {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Gemini API Key missing. Go to Settings tab (⚙️) to enter your key or add GEMINI_API_KEY to AI Studio Secrets.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
                 }
             }
         }

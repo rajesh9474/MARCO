@@ -52,8 +52,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.unit.sp
 import com.example.tools.MarcoLogger
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import com.example.data.FirebaseAuthManager
 import com.example.data.Language
 import com.example.ui.MarcoViewModel
@@ -70,9 +80,18 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val preferredLanguage by viewModel.preferredLanguage.collectAsState()
     val isBackgroundActive by viewModel.isBackgroundActive.collectAsState()
     val isWakeWordActive by viewModel.isContinuousWakeWordActive.collectAsState()
+    val isApiKeyConfigured by viewModel.isApiKeyConfigured.collectAsState()
+    val apiKeySource by viewModel.apiKeySource.collectAsState()
+
+    var customApiKeyInput by remember { mutableStateOf(viewModel.getCustomApiKey()) }
+    var isApiKeyVisible by remember { mutableStateOf(false) }
+    var testKeyStatusMsg by remember { mutableStateOf("") }
+    var isTestingKey by remember { mutableStateOf(false) }
+    var testKeySuccess by remember { mutableStateOf(false) }
 
     var speechRate by remember { mutableFloatStateOf(viewModel.textToSpeech.speechRate) }
     var pitch by remember { mutableFloatStateOf(viewModel.textToSpeech.pitch) }
@@ -101,10 +120,171 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                text = "Voice, Language, Theme & Permissions",
+                text = "Voice, Language, Theme & Gemini API Key",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+
+        // Gemini AI API Key Configuration Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Key,
+                                contentDescription = null,
+                                tint = MarcoCyanPrimary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Gemini API Key",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        // Status badge
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isApiKeyConfigured) MarcoEmeraldSuccess.copy(alpha = 0.2f) else MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (isApiKeyConfigured) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = if (isApiKeyConfigured) MarcoEmeraldSuccess else MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isApiKeyConfigured) "Configured" else "Key Missing",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = if (isApiKeyConfigured) MarcoEmeraldSuccess else MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "Source: $apiKeySource",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = customApiKeyInput,
+                        onValueChange = { customApiKeyInput = it },
+                        label = { Text("Enter Gemini API Key (AIzaSy...)") },
+                        placeholder = { Text("AIzaSy...") },
+                        singleLine = true,
+                        visualTransformation = if (isApiKeyVisible) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { isApiKeyVisible = !isApiKeyVisible }) {
+                                Icon(
+                                    imageVector = if (isApiKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (isApiKeyVisible) "Hide Key" else "Show Key"
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("gemini_api_key_input")
+                    )
+
+                    if (testKeyStatusMsg.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = testKeyStatusMsg,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (testKeySuccess) MarcoEmeraldSuccess else MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.saveCustomApiKey(customApiKeyInput)
+                                testKeyStatusMsg = "✓ API Key saved successfully!"
+                                testKeySuccess = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("save_api_key_button")
+                        ) {
+                            Text("Save Key", fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                isTestingKey = true
+                                testKeyStatusMsg = "Testing API connection with Gemini..."
+                                coroutineScope.launch {
+                                    val (success, message) = viewModel.testApiKeyConnection(customApiKeyInput)
+                                    isTestingKey = false
+                                    testKeySuccess = success
+                                    testKeyStatusMsg = message
+                                }
+                            },
+                            enabled = !isTestingKey,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("test_api_key_button")
+                        ) {
+                            if (isTestingKey) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Testing...", fontSize = 12.sp)
+                            } else {
+                                Text("Test Key", fontSize = 12.sp)
+                            }
+                        }
+
+                        if (customApiKeyInput.isNotBlank()) {
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.clearCustomApiKey()
+                                    customApiKeyInput = ""
+                                    testKeyStatusMsg = "Custom key cleared. Falling back to BuildConfig."
+                                    testKeySuccess = true
+                                },
+                                modifier = Modifier.testTag("clear_api_key_button")
+                            ) {
+                                Text("Clear", fontSize = 12.sp)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Tip: You can get a free API Key at https://aistudio.google.com or enter GEMINI_API_KEY in the Secrets panel in AI Studio.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
 
         // Theme & Visual Appearance Setting

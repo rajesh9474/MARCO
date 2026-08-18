@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+import com.example.data.ApiKeyManager
 import com.example.data.FirebaseAuthManager
 import com.example.data.FirestoreManager
 import com.example.ui.screens.CHAT_ROLES
@@ -47,8 +48,28 @@ class MarcoViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = application.getSharedPreferences("marco_theme_prefs", android.content.Context.MODE_PRIVATE)
 
+    val isApiKeyConfigured: StateFlow<Boolean> = ApiKeyManager.isConfigured
+    val apiKeySource: StateFlow<String> = ApiKeyManager.apiKeySource
+
     init {
         FirebaseAuthManager.instance.init(application)
+        ApiKeyManager.init(application)
+    }
+
+    fun saveCustomApiKey(key: String) {
+        ApiKeyManager.saveCustomApiKey(key)
+    }
+
+    fun clearCustomApiKey() {
+        ApiKeyManager.clearCustomApiKey()
+    }
+
+    fun getCustomApiKey(): String {
+        return ApiKeyManager.getCustomApiKey()
+    }
+
+    suspend fun testApiKeyConnection(key: String? = null): Pair<Boolean, String> {
+        return aiEngine.testApiKey(key)
     }
 
     private val _themeMode = MutableStateFlow(

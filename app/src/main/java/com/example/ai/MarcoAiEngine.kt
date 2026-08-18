@@ -2,6 +2,7 @@ package com.example.ai
 
 import com.example.BuildConfig
 import com.example.data.ActionIntent
+import com.example.data.ApiKeyManager
 import com.example.data.Language
 import com.example.data.ParsedIntent
 import com.example.voice.WakeWordDetector
@@ -15,13 +16,53 @@ import java.net.URL
 
 class MarcoAiEngine {
 
+    suspend fun testApiKey(customKey: String? = null): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        val key = customKey?.takeIf { it.isNotBlank() } ?: ApiKeyManager.getApiKey()
+        if (key.isBlank() || key == "MY_GEMINI_API_KEY") {
+            return@withContext Pair(false, "No API key provided. Please enter a valid Gemini API key.")
+        }
+        try {
+            val url = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$key")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 10000
+            conn.readTimeout = 10000
+
+            val jsonPayload = JSONObject().apply {
+                put("contents", listOf(
+                    JSONObject().apply {
+                        put("parts", listOf(JSONObject().apply { put("text", "Hello, reply with 'OK'") }))
+                    }
+                ))
+            }
+
+            OutputStreamWriter(conn.outputStream).use { it.write(jsonPayload.toString()) }
+            val responseCode = conn.responseCode
+            if (responseCode == 200) {
+                return@withContext Pair(true, "✓ Gemini API connection successful! Model responded.")
+            } else {
+                val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP $responseCode"
+                val message = try {
+                    JSONObject(err).optJSONObject("error")?.optString("message") ?: "HTTP $responseCode"
+                } catch (e: Exception) {
+                    "HTTP $responseCode"
+                }
+                return@withContext Pair(false, "API Key Error ($responseCode): $message")
+            }
+        } catch (e: Exception) {
+            return@withContext Pair(false, "Network error testing key: ${e.localizedMessage}")
+        }
+    }
+
     suspend fun processUserSpeech(
         userSpeech: String,
         preferredLanguage: Language = Language.AUTO,
         isOnline: Boolean = true
     ): ParsedIntent = withContext(Dispatchers.IO) {
         val cleanSpeech = WakeWordDetector.extractCommandAfterWakeWord(userSpeech)
-        val apiKey = try { BuildConfig.GEMINI_API_KEY } catch (e: Exception) { "" }
+        val apiKey = ApiKeyManager.getApiKey()
 
         if (isOnline && apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
             try {
@@ -177,9 +218,9 @@ class MarcoAiEngine {
         model: String = "gemini-3.5-flash",
         enableHighThinking: Boolean = false
     ): String = withContext(Dispatchers.IO) {
-        val apiKey = try { BuildConfig.GEMINI_API_KEY } catch (e: Exception) { "" }
+        val apiKey = ApiKeyManager.getApiKey()
         if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
-            return@withContext "API key not configured. Please add GEMINI_API_KEY in secrets."
+            return@withContext "Gemini API key is not configured. Please enter your API key in the Settings tab (⚙️) or add GEMINI_API_KEY to AI Studio Secrets."
         }
 
         val effectiveModel = when {
